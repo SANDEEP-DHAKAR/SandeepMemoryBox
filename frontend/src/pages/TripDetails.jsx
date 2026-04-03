@@ -41,29 +41,51 @@ const TripDetails = () => {
         
         setUploading(true);
         setUploadProgress(0);
-        
-        const formData = new FormData();
-        acceptedFiles.forEach(file => {
-            formData.append('media', file);
-        });
-
         const token = localStorage.getItem('token');
+
         try {
-            const res = await axios.post(`http://localhost:5000/api/trips/${id}/media`, formData, {
-                headers: { 
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data'
-                },
-                onUploadProgress: (progressEvent) => {
-                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                    setUploadProgress(percentCompleted);
-                }
-            });
-            
-            setTrip(res.data);
+            for (let i = 0; i < acceptedFiles.length; i++) {
+                const file = acceptedFiles[i];
+                console.log(`Uploading file ${i+1}/${acceptedFiles.length}: ${file.name}`);
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // 1. Upload file to Cloudinary via backend
+                const uploadRes = await axios.post(`http://localhost:5000/api/upload`, formData, {
+                    headers: { 
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data'
+                    },
+                    onUploadProgress: (progressEvent) => {
+                        const filePercent = (progressEvent.loaded * 100) / progressEvent.total;
+                        const overallPercent = Math.round(((i * 100) + filePercent) / acceptedFiles.length);
+                        setUploadProgress(overallPercent);
+                    }
+                });
+                
+                console.log(`Uploaded file url: ${uploadRes.data.url}`);
+
+                // 2. Attach media URL to the trip
+                const mediaItem = {
+                    url: uploadRes.data.url,
+                    resourceType: uploadRes.data.type,
+                    publicId: uploadRes.data.publicId
+                };
+                
+                const attachRes = await axios.post(`http://localhost:5000/api/trips/${id}/media`, { mediaItem }, {
+                    headers: { 
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                setTrip(attachRes.data); // Update UI
+            }
             toast.success('Media uploaded successfully');
         } catch (error) {
-            toast.error('Error uploading media');
+            console.error("Upload error:", error.response?.data || error.message);
+            toast.error(error.response?.data?.message || 'Error uploading media');
         } finally {
             setUploading(false);
             setUploadProgress(0);

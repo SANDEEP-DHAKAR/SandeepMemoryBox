@@ -1,5 +1,4 @@
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('cloudinary').v2;
 
 cloudinary.config({
@@ -8,14 +7,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'sandeepmemorybox',
-        resource_type: 'auto', // supports images and videos
-        allowed_formats: ['jpg', 'jpeg', 'png', 'mp4', 'mov', 'webm']
-    }
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({ storage: storage });
 

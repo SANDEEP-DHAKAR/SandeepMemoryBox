@@ -15,6 +15,7 @@ app.use(express.json({ extended: false }));
 // Define Routes
 app.use('/api/auth', require('./routes/authRoute'));
 app.use('/api/trips', require('./routes/tripRoute'));
+app.use('/api/upload', require('./routes/uploadRoute'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -40,17 +40,18 @@ const Dashboard = () => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            const formData = new FormData();
-            formData.append('title', title);
-            formData.append('description', description);
-            formData.append('location', location);
-            if (date) formData.append('date', date);
-            formData.append('isPublic', isPublic);
+            const tripData = {
+                title,
+                description,
+                location,
+                date: date || undefined,
+                isPublic
+            };
 
-            await axios.post('http://localhost:5000/api/trips', formData, {
+            await axios.post('http://localhost:5000/api/trips', tripData, {
                 headers: { 
                     Authorization: `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data'
+                    'Content-Type': 'application/json'
                 }
             });
 

@@ -3,14 +3,10 @@ const crypto = require('crypto');
 
 exports.createTrip = async (req, res) => {
     try {
-        const { title, description, location, date, isPublic } = req.body;
+        const { title, description, location, date, isPublic, media } = req.body;
         const publicId = crypto.randomBytes(8).toString('hex');
 
-        const mediaUrls = req.files ? req.files.map(file => ({
-            url: file.path,
-            publicId: file.filename,
-            resourceType: file.mimetype.startsWith('video') ? 'video' : 'image'
-        })) : [];
+        const mediaUrls = Array.isArray(media) ? media : [];
 
         const newTrip = new Trip({
             user: req.user.id,
@@ -94,13 +90,12 @@ exports.addMediaToTrip = async (req, res) => {
             return res.status(401).json({ message: 'Not authorized' });
         }
 
-        const mediaUrls = req.files ? req.files.map(file => ({
-            url: file.path,
-            publicId: file.filename,
-            resourceType: file.mimetype.startsWith('video') ? 'video' : 'image'
-        })) : [];
+        const { mediaItem } = req.body;
+        if (!mediaItem || !mediaItem.url) {
+            return res.status(400).json({ message: 'No media item provided' });
+        }
 
-        trip.media.push(...mediaUrls);
+        trip.media.push(mediaItem);
         await trip.save();
         res.json(trip);
     } catch (error) {
