@@ -3,7 +3,16 @@ const router = express.Router();
 const { upload, cloudinary } = require('../middleware/uploadMiddleware');
 const auth = require('../middleware/authMiddleware');
 
-router.post('/', auth, upload.single('file'), (req, res) => {
+router.post('/', auth, (req, res, next) => {
+    const uploadSingle = upload.single('file');
+    uploadSingle(req, res, (err) => {
+        if (err) {
+            console.error("Multer error:", err);
+            return res.status(400).json({ message: err.message || 'File upload error' });
+        }
+        next();
+    });
+}, (req, res) => {
     if (!req.file) {
         console.error("No file received in request");
         return res.status(400).json({ message: 'No file uploaded' });
