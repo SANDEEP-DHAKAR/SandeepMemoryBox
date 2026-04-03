@@ -3,6 +3,8 @@ import axios from 'axios';
 
 export const AuthContext = createContext();
 
+const API_URL = "https://sandeepmemorybox-backend.onrender.com";
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -11,7 +13,7 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         if (token) {
             try {
-                const res = await axios.get('http://localhost:5000/api/auth/me', {
+                const res = await axios.get(`${API_URL}/api/auth/me`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setUser(res.data);
@@ -28,13 +30,13 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (username, password) => {
-        const res = await axios.post('http://localhost:5000/api/auth/login', { username, password });
+        const res = await axios.post(`${API_URL}/api/auth/login`, { username, password });
         localStorage.setItem('token', res.data.token);
         setUser(res.data.user);
     };
 
     const register = async (username, password) => {
-        const res = await axios.post('http://localhost:5000/api/auth/register', { username, password });
+        const res = await axios.post(`${API_URL}/api/auth/register`, { username, password });
         localStorage.setItem('token', res.data.token);
         setUser(res.data.user);
     };
