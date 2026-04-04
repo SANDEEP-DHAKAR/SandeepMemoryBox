@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TripCard from '../components/TripCard';
+import { AuthContext } from '../context/AuthContext';
+import { useTrips } from '../hooks/useTrips';
 import './Dashboard.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Dashboard = () => {
-    const [trips, setTrips] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { getAuthHeaders } = useContext(AuthContext);
+    const { trips, loading, error, fetchPrivateTrips } = useTrips();
     const [isModalOpen, setIsModalOpen] = useState(false);
     
     // Form state
@@ -18,28 +22,13 @@ const Dashboard = () => {
     const [date, setDate] = useState('');
     const [isPublic, setIsPublic] = useState(true);
 
-    const fetchTrips = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/trips', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setTrips(res.data);
-            setLoading(false);
-        } catch (error) {
-            toast.error('Failed to load trips');
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
-        fetchTrips();
+        fetchPrivateTrips();
     }, []);
 
     const handleCreateTrip = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
             const tripData = {
                 title,
                 description,
@@ -48,9 +37,9 @@ const Dashboard = () => {
                 isPublic
             };
 
-            await axios.post('http://localhost:5000/api/trips', tripData, {
+            await axios.post(`${API_URL}/api/trips`, tripData, {
                 headers: { 
-                    Authorization: `Bearer ${token}`,
+                    ...getAuthHeaders(),
                     'Content-Type': 'application/json'
                 }
             });
@@ -59,7 +48,7 @@ const Dashboard = () => {
             setIsModalOpen(false);
             // Reset form
             setTitle(''); setDescription(''); setLocation(''); setDate(''); setIsPublic(true);
-            fetchTrips();
+            fetchPrivateTrips();
         } catch (error) {
             toast.error(error.response?.data?.message || 'Error creating trip');
         }

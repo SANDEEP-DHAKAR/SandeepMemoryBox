@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import './TripDetails.css'; // Reuse CSS
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const PublicTrip = () => {
     const { publicId } = useParams();
     const [trip, setTrip] = useState(null);
@@ -17,10 +19,11 @@ const PublicTrip = () => {
     useEffect(() => {
         const fetchPublicTrip = async () => {
             try {
-                const res = await axios.get(`http://localhost:5000/api/trips/p/${publicId}`);
+                const res = await axios.get(`${API_URL}/api/trips/p/${publicId}`);
                 setTrip(res.data);
                 setLoading(false);
             } catch (err) {
+                console.error('Error fetching public trip:', err);
                 setError('This trip is private or does not exist.');
                 setLoading(false);
             }

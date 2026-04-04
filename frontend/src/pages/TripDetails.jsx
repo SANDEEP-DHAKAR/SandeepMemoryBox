@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useDropzone } from 'react-dropzone';
@@ -7,11 +7,15 @@ import { MapPin, Calendar, Share2, Trash2, UploadCloud, X, Play } from 'lucide-r
 import { LazyLoadImage } from 'react-lazy-load-image-component';
 import { motion, AnimatePresence } from 'framer-motion';
 import 'react-lazy-load-image-component/src/effects/blur.css';
+import { AuthContext } from '../context/AuthContext';
 import './TripDetails.css';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const TripDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { getAuthHeaders } = useContext(AuthContext);
     const [trip, setTrip] = useState(null);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -20,13 +24,13 @@ const TripDetails = () => {
 
     const fetchTrip = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/trips/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
+            const res = await axios.get(`${API_URL}/api/trips/${id}`, {
+                headers: getAuthHeaders()
             });
             setTrip(res.data);
             setLoading(false);
         } catch (error) {
+            console.error('Error fetching trip:', error);
             toast.error('Failed to load trip');
             navigate('/dashboard');
         }
@@ -41,7 +45,6 @@ const TripDetails = () => {
         
         setUploading(true);
         setUploadProgress(0);
-        const token = localStorage.getItem('token');
 
         try {
             for (let i = 0; i < acceptedFiles.length; i++) {
@@ -52,9 +55,9 @@ const TripDetails = () => {
                 formData.append('file', file);
                 
                 // 1. Upload file to Cloudinary via backend
-                const uploadRes = await axios.post(`http://localhost:5000/api/upload`, formData, {
+                const uploadRes = await axios.post(`${API_URL}/api/upload`, formData, {
                     headers: { 
-                        Authorization: `Bearer ${token}`,
+                        ...getAuthHeaders(),
                         'Content-Type': 'multipart/form-data'
                     },
                     onUploadProgress: (progressEvent) => {
@@ -73,9 +76,9 @@ const TripDetails = () => {
                     publicId: uploadRes.data.publicId
                 };
                 
-                const attachRes = await axios.post(`http://localhost:5000/api/trips/${id}/media`, { mediaItem }, {
+                const attachRes = await axios.post(`${API_URL}/api/trips/${id}/media`, { mediaItem }, {
                     headers: { 
-                        Authorization: `Bearer ${token}`,
+                        ...getAuthHeaders(),
                         'Content-Type': 'application/json'
                     }
                 });
@@ -90,7 +93,7 @@ const TripDetails = () => {
             setUploading(false);
             setUploadProgress(0);
         }
-    }, [id]);
+    }, [id, getAuthHeaders]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
