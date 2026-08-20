@@ -1,28 +1,41 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./config/db');
+require('dotenv').config();
 
-// Connect Database
-connectDB();
+const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
+const tripRoutes = require('./routes/tripRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
+connectDB();
 
-// Init Middleware
 app.use(cors());
-app.use(express.json({ extended: false }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Define Routes
-app.use('/api/auth', require('./routes/authRoute'));
-app.use('/api/trips', require('./routes/tripRoute'));
-app.use('/api/upload', require('./routes/uploadRoute'));
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/upload', uploadRoutes);
 
-// Error handling middleware
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
+
+// 404 Route Handler
+app.use((req, res, next) => {
+  res.status(404).json({ message: `Route ${req.originalUrl} not found` });
+});
+
+// Global Error Handler
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('Something broke!');
+  console.error('Unhandled Error:', err);
+  res.status(err.status || 500).json({
+    message: err.message || 'Internal Server Error'
+  });
 });
 
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 SandeepMemoryBox Server running on port ${PORT}`));

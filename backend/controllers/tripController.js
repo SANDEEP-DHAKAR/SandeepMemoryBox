@@ -1,105 +1,149 @@
 const Trip = require('../models/Trip');
-const crypto = require('crypto');
+const cloudinary = require('../config/cloudinary');
 
+// Get all trips for logged in user
+exports.getUserTrips = async (req, res) => {
+  try {
+    const trips = await Trip.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    res.json(trips);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Create a new trip
 exports.createTrip = async (req, res) => {
-    try {
-        const { title, description, location, date, isPublic, media } = req.body;
-        const publicId = crypto.randomBytes(8).toString('hex');
-
-        const mediaUrls = Array.isArray(media) ? media : [];
-
-        const newTrip = new Trip({
-            user: req.user.id,
-            title,
-            description,
-            location,
-            date,
-            isPublic: isPublic !== false && isPublic !== 'false',
-            publicId,
-            media: mediaUrls
-        });
-
-        const trip = await newTrip.save();
-        res.status(201).json(trip);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+  try {
+    const { title, description, location, date, isPublic } = req.body;
+    if (!title) {
+      return res.status(400).json({ message: 'Title is required' });
     }
+
+    const trip = await Trip.create({
+      userId: req.user._id,
+      title,
+      description: description || '',
+      location: location || '',
+      date: date ? new Date(date) : undefined,
+      isPublic: isPublic !== undefined ? isPublic : true
+    });
+    res.status(201).json(trip);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
-exports.getTrips = async (req, res) => {
-    try {
-        const trips = await Trip.find({ user: req.user.id }).sort({ date: -1 });
-        res.json(trips);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
-};
-
+// Get single trip by ID (Private)
 exports.getTripById = async (req, res) => {
-    try {
-        const trip = await Trip.findById(req.params.id);
-        if (!trip) return res.status(404).json({ message: 'Trip not found' });
-        
-        if (trip.user.toString() !== req.user.id) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
-        res.json(trip);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
+  try {
+    const trip = await Trip.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+    res.json(trip);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
+// Get single trip by publicId (Public - no auth required)
 exports.getPublicTrip = async (req, res) => {
-    try {
-        const trip = await Trip.findOne({ publicId: req.params.publicId });
-        if (!trip) return res.status(404).json({ message: 'Trip not found' });
-        if (!trip.isPublic) return res.status(403).json({ message: 'This trip is private' });
-        res.json(trip);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
+  try {
+    const trip = await Trip.findOne({ publicId: req.params.publicId, isPublic: true });
+    if (!trip) return res.status(404).json({ message: 'Trip not found or private' });
+    res.json(trip);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
+// Attach media to trip
+exports.attachMedia = async (req, res) => {
+  try {
+    const { mediaItem } = req.body;
+    if (!mediaItem || !mediaItem.url || !mediaItem.publicId) {
+      return res.status(400).json({ message: 'Invalid media item' });
+    }
+
+    const trip = await Trip.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },
+      { $push: { media: mediaItem } },
+      { new: true }
+    );
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+    res.json(trip);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Delete single media item from trip (and destroy Cloudinary asset)
+exports.deleteMediaItem = async (req, res) => {
+  try {
+    const { id, mediaId } = req.params;
+    const trip = await Trip.findOne({ _id: id, userId: req.user._id });
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+    const mediaItem = trip.media.id(mediaId);
+    if (!mediaItem) return res.status(404).json({ message: 'Media item not found' });
+
+    // Try destroying Cloudinary asset if publicId exists
+    if (mediaItem.publicId) {
+      try {
+        await cloudinary.uploader.destroy(mediaItem.publicId, {
+          resource_type: mediaItem.resourceType || 'image'
+        });
+      } catch (cloudErr) {
+        console.error('Cloudinary deletion warning:', cloudErr.message);
+      }
+    }
+
+    trip.media.pull(mediaId);
+    await trip.save();
+
+    res.json({ message: 'Media item deleted', trip });
+  } catch (err) {
+    console.error('deleteMediaItem error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Toggle public visibility
+exports.togglePublic = async (req, res) => {
+  try {
+    const trip = await Trip.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+
+    trip.isPublic = !trip.isPublic;
+    await trip.save();
+    res.json(trip);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Delete entire trip
 exports.deleteTrip = async (req, res) => {
-    try {
-        const trip = await Trip.findById(req.params.id);
-        if (!trip) return res.status(404).json({ message: 'Trip not found' });
+  try {
+    const trip = await Trip.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
 
-        if (trip.user.toString() !== req.user.id) {
-            return res.status(401).json({ message: 'Not authorized' });
+    // Clean up all Cloudinary assets in this trip
+    if (trip.media && trip.media.length > 0) {
+      for (const item of trip.media) {
+        if (item.publicId) {
+          try {
+            await cloudinary.uploader.destroy(item.publicId, {
+              resource_type: item.resourceType || 'image'
+            });
+          } catch (cloudErr) {
+            console.error('Cloudinary destroy error during trip delete:', cloudErr.message);
+          }
         }
-
-        await trip.deleteOne();
-        res.json({ message: 'Trip deleted' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+      }
     }
-};
 
-exports.addMediaToTrip = async (req, res) => {
-    try {
-        const trip = await Trip.findById(req.params.id);
-        if (!trip) return res.status(404).json({ message: 'Trip not found' });
-
-        if (trip.user.toString() !== req.user.id) {
-            return res.status(401).json({ message: 'Not authorized' });
-        }
-
-        const { mediaItem } = req.body;
-        if (!mediaItem || !mediaItem.url) {
-            return res.status(400).json({ message: 'No media item provided' });
-        }
-
-        trip.media.push(mediaItem);
-        await trip.save();
-        res.json(trip);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
+    await Trip.deleteOne({ _id: req.params.id });
+    res.json({ message: 'Trip deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
