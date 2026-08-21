@@ -20,15 +20,14 @@ export const AuthProvider = ({ children }) => {
         if (token) {
             try {
                 const res = await axios.get(`${API_URL}/api/auth/me`, {
-                    headers: getAuthHeaders()
+                    headers: { Authorization: `Bearer ${token}` }
                 });
                 setUser(res.data);
                 setError(null);
-            } catch (error) {
-                console.error('Error checking login:', error);
+            } catch (err) {
+                console.error('Error verifying user session:', err);
                 localStorage.removeItem('token');
                 setUser(null);
-                setError('Failed to verify authentication. Please log in again.');
             }
         }
         setLoading(false);
@@ -44,10 +43,12 @@ export const AuthProvider = ({ children }) => {
             const res = await axios.post(`${API_URL}/api/auth/login`, { username, password });
             localStorage.setItem('token', res.data.token);
             setUser(res.data.user);
-        } catch (error) {
-            console.error('Login error:', error);
-            setError(error.response?.data?.message || 'Login failed. Please check your credentials.');
-            throw error; // Re-throw to let component handle
+            return res.data;
+        } catch (err) {
+            console.error('Login error:', err);
+            const message = err.response?.data?.message || 'Login failed. Check your credentials.';
+            setError(message);
+            throw err;
         }
     };
 
@@ -57,10 +58,12 @@ export const AuthProvider = ({ children }) => {
             const res = await axios.post(`${API_URL}/api/auth/register`, { username, password });
             localStorage.setItem('token', res.data.token);
             setUser(res.data.user);
-        } catch (error) {
-            console.error('Register error:', error);
-            setError(error.response?.data?.message || 'Registration failed. Please try again.');
-            throw error; // Re-throw to let component handle
+            return res.data;
+        } catch (err) {
+            console.error('Register error:', err);
+            const message = err.response?.data?.message || 'Registration failed. Try again.';
+            setError(message);
+            throw err;
         }
     };
 
